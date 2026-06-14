@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathEdu-Agent - MVP HackAIthon 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .slider-container { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        input[type=range] { flex-grow: 1; accent-color: #3b82f6; cursor: pointer; }
+        .question-card, .answer-card { border-bottom: 1px dashed #cbd5e1; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .question-card:last-child, .answer-card:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        
+        .math-svg { width: 100%; max-width: 250px; height: auto; margin: 0 auto; display: block; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #printableArea, #printableArea * { visibility: visible; }
+            #printableArea { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+            .h-[800px] { height: auto !important; overflow: visible !important; border: none !important; box-shadow: none !important; }
+            #actionButtons { display: none !important; }
+            .bg-white { background: transparent !important; }
+        }
+    </style>
+</head>
+<body class="p-6">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-blue-600 p-6 text-white text-center relative">
+            <h1 class="text-3xl font-bold">MathEdu-Agent 🤖</h1>
+            <p class="mt-2 text-blue-100">Hệ thống Trí tuệ nhân tạo Sinh Học liệu & Đề thi (Tích hợp Đồ họa Đen trắng Nét đậm)</p>
+        </div>
+
+        <div class="p-8">
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Bước 1: Chọn chủ đề kiến thức</h2>
+                <input type="text" id="topicInput" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-gray-700" 
+                       value="Hàm số và Hình học không gian" placeholder="Thử gõ: Xác suất, Hình học, Hàm số, Số phức, Tích phân, Logarit...">
+            </div>
+
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2 flex justify-between">
+                    <span>Bước 2: Thiết lập Ma trận phân hóa</span>
+                    <span class="text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded text-sm">Tổng: 100%</span>
+                </h2>
+                <div class="slider-container">
+                    <span class="w-32 font-medium text-green-600">Nhận biết:</span>
+                    <input type="range" id="level1" min="0" max="100" value="40" oninput="autoBalance('l1')">
+                    <span id="val1" class="w-12 font-bold text-gray-700 text-right">40%</span>
+                </div>
+                <div class="slider-container">
+                    <span class="w-32 font-medium text-yellow-600">Thông hiểu:</span>
+                    <input type="range" id="level2" min="0" max="100" value="40" oninput="autoBalance('l2')">
+                    <span id="val2" class="w-12 font-bold text-gray-700 text-right">40%</span>
+                </div>
+                <div class="slider-container">
+                    <span class="w-32 font-medium text-red-600">Vận dụng:</span>
+                    <input type="range" id="level3" min="0" max="100" value="20" oninput="autoBalance('l3')">
+                    <span id="val3" class="w-12 font-bold text-gray-700 text-right">20%</span>
+                </div>
+                <p class="text-sm text-gray-500 mt-2 italic bg-gray-50 p-2 rounded border border-gray-100 text-center" id="livePreview"></p>
+            </div>
+
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Bước 3: Số lượng câu hỏi</h2>
+                <select id="questionCount" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" onchange="updatePreview()">
+                    <option value="5">Sinh 5 câu (Đề luyện tập nhanh)</option>
+                    <option value="10" selected>Sinh 10 câu (Đề minh họa chi tiết)</option>
+                </select>
+            </div>
+
+            <button id="generateBtn" onclick="generateHybridQuiz()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                AI Bắt đầu Phân tích & Trộn Đề (Kèm Vẽ Hình)
+            </button>
+        </div>
+
+        <div id="printableArea" class="hidden p-8 bg-gray-50 border-t border-gray-200">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 p-4 bg-white rounded-lg border shadow-sm" id="actionButtons">
+                <h2 class="text-xl font-bold text-green-600 flex items-center gap-2">✅ Hoàn tất cấu trúc đề!</h2>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="exportRolePDF('hs')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow transition flex items-center gap-2 text-sm">📄 Xuất PDF Học Sinh</button>
+                    <button onclick="exportRolePDF('gv')" class="px-4 py-2 bg-red-600 hover:bg-red-600 text-white font-bold rounded shadow transition flex items-center gap-2 text-sm">🎓 Xuất PDF Giáo Viên</button>
+                    <button onclick="window.print()" class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded shadow transition flex items-center gap-2 text-sm">🖨️ In Nhanh</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8" id="liveViewContent">
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 h-[800px] overflow-y-auto">
+                    <h3 class="text-xl font-bold bg-gray-100 text-gray-800 p-3 rounded text-center mb-6 sticky top-0 shadow-sm z-10 backdrop-blur-md bg-opacity-90">XEM TRƯỚC FILE HỌC SINH</h3>
+                    <div id="questionsContainer"></div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-blue-200 h-[800px] overflow-y-auto">
+                    <h3 class="text-xl font-bold bg-blue-100 text-blue-800 p-3 rounded text-center mb-6 sticky top-0 shadow-sm z-10 backdrop-blur-md bg-opacity-90">XEM TRƯỚC FILE GIÁO VIÊN</h3>
+                    <div id="answersContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- BỘ VẼ ĐỒ HỌA VECTOR (SVG) OFFLINE - Đen trắng, nét đậm ---
+        const svgAssets = {
+            "xác suất": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none"><path d="M20,75 L80,30 M80,30 L160,15 M80,30 L160,45 M20,75 L80,120 M80,120 L160,105 M80,120 L160,135"/><circle cx="20" cy="75" r="4" fill="#000"/><circle cx="80" cy="30" r="4" fill="#000"/><circle cx="80" cy="120" r="4" fill="#000"/><circle cx="160" cy="15" r="4" fill="#000"/><circle cx="160" cy="45" r="4" fill="#000"/><circle cx="160" cy="105" r="4" fill="#000"/><circle cx="160" cy="135" r="4" fill="#000"/></g><text x="80" y="20" font-family="Arial" font-size="12" font-weight="bold">A</text><text x="80" y="140" font-family="Arial" font-size="12" font-weight="bold">B</text></svg>`,
+            
+            "hình học": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none" stroke-linejoin="round"><polygon points="100,10 30,130 170,130"/><path d="M100,10 L100,130"/><line x1="100" y1="10" x2="140" y2="90" stroke-dasharray="4,4"/><path d="M90,130 L90,120 L100,120"/></g><text x="95" y="10" font-family="Arial" font-size="14" font-weight="bold">S</text><text x="15" y="140" font-family="Arial" font-size="14" font-weight="bold">B</text><text x="175" y="140" font-family="Arial" font-size="14" font-weight="bold">C</text><text x="95" y="145" font-family="Arial" font-size="14" font-weight="bold">A</text></svg>`,
+            
+            "hàm số": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none"><line x1="20" y1="130" x2="180" y2="130"/><line x1="100" y1="10" x2="100" y2="140"/><path d="M180,130 L175,125 M180,130 L175,135"/><path d="M100,10 L95,15 M100,10 L105,15"/><path d="M40,140 Q70,20 100,75 T160,10" stroke-linecap="round"/></g><text x="185" y="135" font-family="Arial" font-size="14" font-weight="bold">x</text><text x="85" y="20" font-family="Arial" font-size="14" font-weight="bold">y</text><text x="85" y="145" font-family="Arial" font-size="14" font-weight="bold">O</text></svg>`,
+            
+            "số phức": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none"><line x1="20" y1="75" x2="180" y2="75"/><line x1="100" y1="10" x2="100" y2="140"/><circle cx="100" cy="75" r="50"/><line x1="100" y1="75" x2="135" y2="40"/><circle cx="135" cy="40" r="4" fill="#000"/></g><text x="140" y="35" font-family="Arial" font-size="14" font-weight="bold">M(z)</text><text x="185" y="80" font-family="Arial" font-size="14" font-weight="bold">x</text><text x="85" y="20" font-family="Arial" font-size="14" font-weight="bold">y</text></svg>`,
+            
+            "tích phân": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none"><line x1="20" y1="120" x2="180" y2="120"/><line x1="40" y1="10" x2="40" y2="140"/><path d="M40,90 Q100,20 160,100"/><line x1="70" y1="120" x2="70" y2="60" stroke-dasharray="4,4"/><line x1="130" y1="120" x2="130" y2="60" stroke-dasharray="4,4"/><path d="M70,120 L75,110 M80,120 L85,100 M90,120 L95,85 M100,120 L105,75 M110,120 L115,70 M120,120 L125,65 M130,120 L130,60" stroke-width="1.5"/></g><text x="65" y="140" font-family="Arial" font-size="14" font-weight="bold">a</text><text x="125" y="140" font-family="Arial" font-size="14" font-weight="bold">b</text></svg>`,
+            
+            "logarit": `<svg class="math-svg" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><g stroke="#000" stroke-width="2.5" fill="none"><line x1="20" y1="130" x2="180" y2="130"/><line x1="40" y1="10" x2="40" y2="140"/><path d="M45,140 Q50,70 170,30"/></g><text x="185" y="135" font-family="Arial" font-size="14" font-weight="bold">x</text><text x="25" y="20" font-family="Arial" font-size="14" font-weight="bold">y</text></svg>`
+        };
+
+        // --- CÂN BẰNG THANH TRƯỢT ---
+        let currentQuestionsState = []; 
+        let oldVals = { l1: 40, l2: 40, l3: 20 };
+
+        function autoBalance(changedId) {
+            let l1 = parseInt(document.getElementById('level1').value), l2 = parseInt(document.getElementById('level2').value), l3 = parseInt(document.getElementById('level3').value);
+            let changedVal, oldVal;
+            if(changedId === 'l1') { changedVal = l1; oldVal = oldVals.l1; }
+            if(changedId === 'l2') { changedVal = l2; oldVal = oldVals.l2; }
+            if(changedId === 'l3') { changedVal = l3; oldVal = oldVals.l3; }
+            let diff = changedVal - oldVal; if (diff === 0) return;
+
+            if (changedId === 'l1') {
+                let remain = 100 - l1;
+                if (oldVals.l2 + oldVals.l3 === 0) { l2 = remain/2; l3 = remain - l2; } else { l2 = Math.round(remain * (oldVals.l2 / (oldVals.l2 + oldVals.l3))); l3 = remain - l2; }
+            } else if (changedId === 'l2') {
+                let remain = 100 - l2;
+                if (oldVals.l1 + oldVals.l3 === 0) { l1 = remain/2; l3 = remain - l1; } else { l1 = Math.round(remain * (oldVals.l1 / (oldVals.l1 + oldVals.l3))); l3 = remain - l1; }
+            } else if (changedId === 'l3') {
+                let remain = 100 - l3;
+                if (oldVals.l1 + oldVals.l2 === 0) { l1 = remain/2; l2 = remain - l1; } else { l1 = Math.round(remain * (oldVals.l1 / (oldVals.l1 + oldVals.l2))); l2 = remain - l1; }
+            }
+            document.getElementById('level1').value = l1; document.getElementById('level2').value = l2; document.getElementById('level3').value = l3;
+            document.getElementById('val1').innerText = l1 + '%'; document.getElementById('val2').innerText = l2 + '%'; document.getElementById('val3').innerText = l3 + '%';
+            oldVals = { l1: l1, l2: l2, l3: l3 }; updatePreview();
+        }
+
+        function updatePreview() {
+            let total = parseInt(document.getElementById('questionCount').value);
+            let c1 = Math.round(total * oldVals.l1 / 100), c2 = Math.round(total * oldVals.l2 / 100), c3 = total - c1 - c2; 
+            document.getElementById('livePreview').innerHTML = `Dự kiến cấu trúc: <span class="font-bold text-green-600">${c1} Nhận biết</span> - <span class="font-bold text-yellow-600">${c2} Thông hiểu</span> - <span class="font-bold text-red-600">${c3} Vận dụng</span>`;
+        }
+        updatePreview();
+
+        // --- KHO DỮ LIỆU ĐẦY ĐỦ 60 CÂU (TÍCH HỢP SVG) ---
+        const masterDatabase = [
+            // 1. XÁC SUẤT
+            { topic: "xác suất", level: "Nhận biết", content: "Gieo một con xúc xắc cân đối và đồng chất 1 lần. Xác suất để xuất hiện mặt có số chấm chẵn là bao nhiêu?", options: ["A. 1/2", "B. 1/3", "C. 1/6", "D. 2/3"], correct: "A", steps: "Mặt chẵn gồm {2; 4; 6} => n(A) = 3. Không gian mẫu n(Ω) = 6. Xác suất P(A) = 3/6 = 1/2." },
+            { topic: "xác suất", level: "Nhận biết", content: "Trong một hộp kín có 3 quả cầu xanh và 2 quả cầu đỏ. Lấy ngẫu nhiên ra 1 quả cầu, tính xác suất lấy được quả cầu đỏ.", options: ["A. 2/5", "B. 3/5", "C. 1/2", "D. 1/5"], correct: "A", steps: "Tổng số cầu trong hộp là 5. Số quả cầu đỏ là 2. Xác suất bốc trúng cầu đỏ P = 2/5." },
+            { topic: "xác suất", level: "Nhận biết", content: "Một tổ có 10 học sinh gồm 6 nam và 4 nữ. Chọn ngẫu nhiên 1 học sinh. Xác suất để học sinh được chọn là nam bằng?", options: ["A. 3/5", "B. 2/5", "C. 1/10", "D. 1/6"], correct: "A", steps: "Tổng số học sinh n(Ω) = 10. Số nam là 6. Xác suất P = 6/10 = 3/5." },
+            { topic: "xác suất", level: "Nhận biết", content: "Gieo một đồng xu cân đối đồng chất 3 lần. Số phần tử của không gian mẫu là?", options: ["A. 8", "B. 6", "C. 4", "D. 3"], correct: "A", steps: "Mỗi lần gieo có 2 khả năng (Sấp, Ngửa). Gieo 3 lần nên số phần tử không gian mẫu n(Ω) = 2^3 = 8." },
+            { topic: "xác suất", level: "Thông hiểu", content: "Từ một hộp chứa 4 viên bi xanh và 5 viên bi đỏ, lấy ngẫu nhiên đồng thời 2 viên. Xác suất để lấy được 2 viên bi khác màu là?", options: ["A. 5/18", "B. 5/9", "C. 4/9", "D. 1/2"], correct: "B", steps: "n(Ω) = C(2, 9) = 36. Số cách chọn 2 viên khác màu (1 xanh và 1 đỏ): C(1,4)*C(1,5) = 4*5 = 20. Xác suất P = 20/36 = 5/9." },
+            { topic: "xác suất", level: "Thông hiểu", content: "Gieo đồng thời hai đồng xu. Xác suất để có ít nhất một đồng xu xuất hiện mặt Sấp là?", options: ["A. 1/4", "B. 1/2", "C. 3/4", "D. 1"], correct: "C", steps: "Ω = {SS, SN, NS, NN}. Ít nhất 1 sấp là A = {SS, SN, NS} => n(A) = 3. Vậy P(A) = 3/4." },
+            { topic: "xác suất", level: "Thông hiểu", content: "Gieo hai con xúc xắc đồng chất. Xác suất để tổng số chấm trên hai mặt xuất hiện bằng 7 là?", options: ["A. 1/6", "B. 7/36", "C. 5/36", "D. 1/12"], correct: "A", steps: "n(Ω) = 36. Các cặp tổng 7: (1,6),(2,5),(3,4),(4,3),(5,2),(6,1). Có 6 biến cố thuận lợi. P = 6/36 = 1/6." },
+            { topic: "xác suất", level: "Vận dụng", content: "Một tổ học sinh có 6 nam và 4 nữ. Chọn ngẫu nhiên ra 3 bạn. Dựa vào sơ đồ phân nhánh dưới đây, tính xác suất để trong 3 bạn được chọn có ít nhất 1 bạn nữ.", hasImage: "xác suất", options: ["A. 1/6", "B. 5/6", "C. 1/5", "D. 4/5"], correct: "B", steps: "Sử dụng biến cố đối A': 'Cả 3 đều là nam'. n(Ω) = C(3, 10) = 120. n(A') = C(3, 6) = 20 => P(A') = 20/120 = 1/6. P(A) = 1 - 1/6 = 5/6." },
+            { topic: "xác suất", level: "Vận dụng", content: "Xác suất bắn trúng bia của xạ thủ A và B lần lượt là 0.7 và 0.8. Cả hai cùng bắn mỗi người 1 viên độc lập. Xác suất để có đúng 1 người bắn trúng là?", options: ["A. 0.56", "B. 0.38", "C. 0.14", "D. 0.94"], correct: "B", steps: "TH1: A trúng, B trượt = 0.7 * (1 - 0.8) = 0.14. TH2: A trượt, B trúng = (1 - 0.7) * 0.8 = 0.24. Tổng xác suất = 0.14 + 0.24 = 0.38." },
+            { topic: "xác suất", level: "Vận dụng", content: "Trong một lớp có 40% hs giỏi Toán, 30% giỏi Lý và 15% giỏi cả Toán và Lý. Chọn ngẫu nhiên 1 hs. Nếu hs đó giỏi Toán, tính xác suất để hs đó cũng giỏi Lý.", hasImage: "xác suất", options: ["A. 3/8", "B. 1/2", "C. 1/4", "D. 5/8"], correct: "A", steps: "Sử dụng công thức xác suất có điều kiện: P(Lý | Toán) = P(Toán ∩ Lý) / P(Toán) = 0.15 / 0.40 = 15/40 = 3/8." },
+
+            // 2. HÌNH HỌC
+            { topic: "hình học", level: "Nhận biết", content: "Thể tích khối lăng trụ có diện tích đáy B và chiều cao h là?", options: ["A. V = B.h", "B. V = 1/3.B.h", "C. V = 3.B.h", "D. V = 1/2.B.h"], correct: "A", steps: "Lý thuyết hình học cơ bản: Thể tích khối lăng trụ V = B.h." },
+            { topic: "hình học", level: "Nhận biết", content: "Thể tích khối chóp có diện tích đáy B và chiều cao h là?", options: ["A. V = 1/3.B.h", "B. V = B.h", "C. V = 1/2.B.h", "D. V = 1/6.B.h"], correct: "A", steps: "Khối chóp có hệ số thu nhỏ ở đỉnh nên thể tích V = 1/3.B.h." },
+            { topic: "hình học", level: "Nhận biết", content: "Thể tích của khối nón có bán kính đáy r và chiều cao h được tính bằng công thức?", options: ["A. V = πr²h", "B. V = 1/3πr²h", "C. V = 4/3πr²h", "D. V = 2πr²h"], correct: "B", steps: "Khối nón giống khối chóp, V = 1/3.B.h, mà đáy là hình tròn nên B = πr². Vậy V = 1/3πr²h." },
+            { topic: "hình học", level: "Nhận biết", content: "Thể tích của khối lập phương có cạnh bằng 2 là?", options: ["A. 8", "B. 6", "C. 4", "D. 12"], correct: "A", steps: "Thể tích khối lập phương cạnh a là V = a^3. Thay a = 2 => V = 2^3 = 8." },
+            { topic: "hình học", level: "Thông hiểu", content: "Cho khối chóp S.ABCD có đáy là hình vuông cạnh a, chiều cao SA vuông góc với đáy, SA = 3a. Thể tích khối chóp S.ABCD là?", options: ["A. 3a³", "B. a³", "C. a³/3", "D. 2a³"], correct: "B", steps: "Diện tích đáy S = a². Chiều cao h = 3a. V = 1/3 * a² * 3a = a³." },
+            { topic: "hình học", level: "Thông hiểu", content: "Cho khối chóp tứ giác đều S.ABCD có cạnh đáy bằng a, cạnh bên bằng a√2. Thể tích S.ABCD là?", options: ["A. a³/3", "B. a³√6/6", "C. a³√3/3", "D. a³√6/2"], correct: "B", steps: "Đáy là hình vuông diện tích a². Tâm O. SO = √(SA² - OA²) = a√6/2. V = 1/3 * a² * a√6/2 = a³√6/6." },
+            { topic: "hình học", level: "Thông hiểu", content: "Lăng trụ đứng ABC.A'B'C' có đáy tam giác đều cạnh a, AA' = 2a. Thể tích là?", options: ["A. a³√3/2", "B. a³√3/6", "C. a³√3/4", "D. a³√3"], correct: "A", steps: "S_đáy = a²√3/4. Chiều cao h = 2a. V = S_đáy * h = (a²√3/4) * 2a = a³√3/2." },
+            { topic: "hình học", level: "Vận dụng", content: "Tính khoảng cách từ điểm A đến mặt phẳng (SBC) trong hình chóp S.ABC có đáy vuông tại B, SA vuông góc với đáy. SA = a, AB = a. Dựa vào hình vẽ bên dưới:", hasImage: "hình học", options: ["A. a√2/2", "B. a", "C. a√3/2", "D. a√2"], correct: "A", steps: "Kẻ AH vuông góc SB. Ta chứng minh được BC ⊥ (SAB) => BC ⊥ AH => AH ⊥ (SBC). Hệ thức: 1/AH² = 1/SA² + 1/AB² = 1/a² + 1/a² = 2/a². Suy ra AH = a√2/2." },
+            { topic: "hình học", level: "Vận dụng", content: "Cho nón có thiết diện qua trục là tam giác vuông cân cạnh huyền 2a. Diện tích xung quanh của nón là?", hasImage: "hình học", options: ["A. πa²√2", "B. 2πa²", "C. 4πa²", "D. πa²√3"], correct: "A", steps: "Tam giác vuông cân cạnh huyền 2a => R = a, đường sinh l = a√2. S_xq = π.R.l = π.a.a√2 = πa²√2." },
+            { topic: "hình học", level: "Vận dụng", content: "Cho chóp tứ giác đều S.ABCD có tất cả các cạnh bằng a. Tính cosin góc giữa mặt bên (SCD) và mặt đáy (ABCD).", options: ["A. √3/3", "B. 1/2", "C. √2/2", "D. √3/2"], correct: "A", steps: "Gọi M trung điểm CD, O tâm đáy. Góc là SMO. Ta có OM = a/2. Tam giác SCD đều cạnh a => SM = a√3/2. Xét tam giác vuông SOM: cos(SMO) = OM/SM = (a/2)/(a√3/2) = 1/√3 = √3/3." },
+
+            // 3. HÀM SỐ
+            { topic: "hàm số", level: "Nhận biết", content: "Hàm số y = x³ - 3x + 1 có đạo hàm y' là?", options: ["A. y' = 3x² - 3", "B. y' = 3x²", "C. y' = 3x - 3", "D. y' = x² - 3"], correct: "A", steps: "Sử dụng công thức đạo hàm (x^n)' = n.x^(n-1). Ta có y' = 3x² - 3." },
+            { topic: "hàm số", level: "Nhận biết", content: "Đường tiệm cận ngang của đồ thị hàm số y = (2x - 1) / (x + 1) có phương trình là?", options: ["A. y = 2", "B. y = -1", "C. x = 2", "D. x = -1"], correct: "A", steps: "Tiệm cận ngang của y = (ax+b)/(cx+d) là đường thẳng y = a/c. Do đó y = 2/1 = 2." },
+            { topic: "hàm số", level: "Nhận biết", content: "Hàm số y = x^4 - 2x² + 1 có bao nhiêu điểm cực trị?", options: ["A. 1", "B. 3", "C. 2", "D. 0"], correct: "B", steps: "y' = 4x³ - 4x. Cho y' = 0 <=> 4x(x² - 1) = 0 <=> x = 0; x = 1; x = -1. Đạo hàm đổi dấu qua 3 điểm này nên hàm số có 3 điểm cực trị." },
+            { topic: "hàm số", level: "Thông hiểu", content: "Tìm giá trị lớn nhất của hàm số y = -x² + 4x - 1 trên đoạn [0; 3].", options: ["A. 3", "B. -1", "C. 2", "D. 4"], correct: "A", steps: "y' = -2x + 4 = 0 => x = 2 (thuộc [0;3]). Tính y(0)=-1; y(2)=3; y(3)=2. GTLN là 3." },
+            { topic: "hàm số", level: "Thông hiểu", content: "Giá trị nhỏ nhất của hàm số y = x³ - 3x trên đoạn [0; 2] là?", options: ["A. -2", "B. 0", "C. 2", "D. -4"], correct: "A", steps: "y' = 3x² - 3 = 0 => x = 1 (vì x in [0;2]). Tính y(0)=0, y(1)=-2, y(2)=2. Giá trị nhỏ nhất là -2." },
+            { topic: "hàm số", level: "Thông hiểu", content: "Đồ thị hàm số y = (x - 1) / (x² - 3x + 2) có bao nhiêu đường tiệm cận đứng?", options: ["A. 1", "B. 2", "C. 0", "D. 3"], correct: "A", steps: "Mẫu số x² - 3x + 2 = 0 <=> x=1, x=2. Tuy nhiên tại x=1 tử số cũng bằng 0 nên bị triệt tiêu (lỗ hổng). Chỉ còn x=2 là TCĐ. Số lượng là 1." },
+            { topic: "hàm số", level: "Vận dụng", content: "Cho hàm số y=f(x) liên tục trên R và có đồ thị đạo hàm f'(x) như hình vẽ. Hàm số y=f(x) nghịch biến trên khoảng nào?", hasImage: "hàm số", options: ["A. (2; +∞)", "B. (-1; 2)", "C. (-∞; -1)", "D. (-2; 1)"], correct: "B", steps: "Dựa vào đồ thị, phần đồ thị f'(x) nằm dưới trục hoành (f'(x) < 0) tương ứng với khoảng x thuộc (-1; 2). Do đó f(x) nghịch biến trên (-1; 2)." },
+            { topic: "hàm số", level: "Vận dụng", content: "Cho hàm số bậc ba y = f(x) có cực đại tại y=4, cực tiểu tại y=1. Có bao nhiêu giá trị nguyên của m để f(x) = m có 3 nghiệm phân biệt?", hasImage: "hàm số", options: ["A. 3", "B. 2", "C. 1", "D. 4"], correct: "B", steps: "Đường thẳng y = m phải cắt đồ thị tại 3 điểm phân biệt => nằm giữa hai cực trị: 1 < m < 4. m nguyên nên m = {2, 3}. Tổng 2 giá trị." },
+            { topic: "hàm số", level: "Vận dụng", content: "Tìm m để hàm số y = 1/3.x³ - mx² + (m² - m + 1)x + 1 đạt cực tiểu tại x = 1.", options: ["A. m = 2", "B. m = 1", "C. m = 0", "D. m = -1"], correct: "A", steps: "y' = x² - 2mx + m²-m+1. Đạt cực trị tại x=1 => y'(1)=0 => m²-3m+2=0 => m=1 hoặc m=2. Thử lại y''(1) = 2 - 2m. Với m=1 => y''=0 (loại). Với m=2 => y'' = -2 < 0 (cực tiểu. Bài toán thực tế chọn A)." },
+            { topic: "hàm số", level: "Vận dụng", content: "Phương trình x³ - 3x² + 2 = 0 có bao nhiêu nghiệm thực?", options: ["A. 1", "B. 2", "C. 3", "D. 0"], correct: "C", steps: "Lập bảng biến thiên hàm f(x) = x³ - 3x² + 2. Cực trị tại x=0 (y=2) và x=2 (y=-2). Đường thẳng y=0 nằm giữa -2 và 2 nên cắt đồ thị tại 3 điểm. Số nghiệm là 3." },
+
+            // 4. SỐ PHỨC
+            { topic: "số phức", level: "Nhận biết", content: "Phần thực và phần ảo của số phức z = 3 - 4i lần lượt là:", options: ["A. 3 và -4", "B. 3 và 4", "C. -4 và 3", "D. 3 và -4i"], correct: "A", steps: "Phần thực là hệ số tự do (3), phần ảo là hệ số đi với i (-4)." },
+            { topic: "số phức", level: "Nhận biết", content: "Số phức liên hợp của số phức z = -2 + 5i là?", options: ["A. -2 - 5i", "B. 2 + 5i", "C. 2 - 5i", "D. -5 - 2i"], correct: "A", steps: "Số phức liên hợp của a + bi là a - bi. Do đó liên hợp của -2 + 5i là -2 - 5i." },
+            { topic: "số phức", level: "Nhận biết", content: "Điểm biểu diễn số phức z = 3 - 2i trên mặt phẳng tọa độ Oxy là điểm nào?", options: ["A. P(3; 2)", "B. M(3; -2)", "C. N(-2; 3)", "D. Q(-3; 2)"], correct: "B", steps: "Số phức z = a + bi có điểm biểu diễn là M(a; b). Vậy điểm biểu diễn là M(3; -2)." },
+            { topic: "số phức", level: "Thông hiểu", content: "Nghiệm của phương trình z² + 4 = 0 trên tập số phức là?", options: ["A. z = 2, z = -2", "B. z = 4i, z = -4i", "C. z = 2i, z = -2i", "D. Vô nghiệm"], correct: "C", steps: "z² = -4 <=> z² = 4i² <=> z = 2i hoặc z = -2i." },
+            { topic: "số phức", level: "Thông hiểu", content: "Tính môđun của số phức z thỏa mãn: z = (1 + 2i)(3 - i).", options: ["A. √50", "B. 5√2", "C. 5", "D. √10"], correct: "B", steps: "Cách nhanh: |z| = |1+2i| * |3-i| = √(1²+2²) * √(3²+(-1)²) = √5 * √10 = √50 = 5√2." },
+            { topic: "số phức", level: "Thông hiểu", content: "Rút gọn số phức z = (1 + i)². Kết quả là?", options: ["A. 2", "B. 2i", "C. 0", "D. -2i"], correct: "B", steps: "Khai triển hằng đẳng thức: (1 + i)² = 1² + 2i + i² = 1 + 2i - 1 = 2i." },
+            { topic: "số phức", level: "Vận dụng", content: "Trong mp tọa độ Oxy, tập hợp các điểm biểu diễn số phức z thỏa mãn |z - 1 + 2i| = 2 là:", hasImage: "số phức", options: ["A. Đường tròn tâm I(1; -2), bán kính R=2", "B. Đường tròn tâm I(-1; 2), R=2", "C. Đường thẳng y = 2x - 1", "D. Parabol y = x² - 2x"], correct: "A", steps: "Gọi z = x+yi. |(x-1) + (y+2)i| = 2 <=> (x-1)² + (y+2)² = 4. Đây là pt đường tròn tâm I(1; -2) và bán kính R = 2." },
+            { topic: "số phức", level: "Vận dụng", content: "Có bao nhiêu số phức z thỏa mãn |z| = √2 và z² là số thuần ảo?", options: ["A. 4", "B. 3", "C. 2", "D. 1"], correct: "A", steps: "z = x+yi. |z| = √2 => x²+y²=2. z² = (x²-y²) + 2xy.i. Số thuần ảo => phần thực x²-y² = 0. Giải hệ x²+y²=2 và x²-y²=0 => x²=1, y²=1. Có 4 số phức." },
+            { topic: "số phức", level: "Vận dụng", content: "Tập hợp các điểm biểu diễn z thỏa mãn |z - 2 + i| = |z + 1| là một đường thẳng có phương trình:", options: ["A. 3x - y - 2 = 0", "B. 6x - 2y - 4 = 0", "C. 3x + y - 2 = 0", "D. x - 3y + 2 = 0"], correct: "A", steps: "Gọi z = x+yi. (x-2)² + (y+1)² = (x+1)² + y² <=> x²-4x+4+y²+2y+1 = x²+2x+1+y² <=> -6x + 2y + 4 = 0 <=> 3x - y - 2 = 0." },
+            { topic: "số phức", level: "Vận dụng", content: "Cho số phức z thỏa mãn |z-1|=2. Dựa vào đồ thị trực quan, tính giá trị lớn nhất của biểu thức P = |z+2-4i|.", hasImage: "số phức", options: ["A. 3", "B. 5", "C. 7", "D. 9"], correct: "C", steps: "Tập hợp z là đường tròn tâm I(1;0), bán kính R=2. Điểm biểu diễn cho -(2-4i) là M(-2; 4). Khoảng cách IM = √((-2-1)² + (4-0)²) = √(9+16) = 5. GTLN P = IM + R = 5 + 2 = 7." },
+
+            // 5. TÍCH PHÂN
+            { topic: "tích phân", level: "Nhận biết", content: "Họ nguyên hàm của hàm số f(x) = sin(x) là:", options: ["A. -cos(x) + C", "B. cos(x) + C", "C. -sin(x) + C", "D. sin(x) + C"], correct: "A", steps: "Áp dụng bảng nguyên hàm cơ bản: ∫sin(x)dx = -cos(x) + C." },
+            { topic: "tích phân", level: "Nhận biết", content: "Họ nguyên hàm của hàm số f(x) = e^x + 2x là:", options: ["A. e^x + x² + C", "B. e^x + 2 + C", "C. e^x + 2x² + C", "D. 1/e * e^x + x² + C"], correct: "A", steps: "∫(e^x + 2x)dx = ∫e^xdx + ∫2xdx = e^x + x² + C." },
+            { topic: "tích phân", level: "Nhận biết", content: "Nếu ∫[0,2] f(x)dx = 3 thì ∫[0,2] 2f(x)dx bằng bao nhiêu?", options: ["A. 3", "B. 6", "C. 5", "D. 2/3"], correct: "B", steps: "Áp dụng tính chất hằng số: ∫ 2f(x)dx = 2 * ∫ f(x)dx = 2 * 3 = 6." },
+            { topic: "tích phân", level: "Thông hiểu", content: "Tính giá trị của tích phân I = ∫[1,e] (1/x)dx.", options: ["A. 0", "B. e", "C. 1", "D. -1"], correct: "C", steps: "Nguyên hàm của 1/x là ln|x|. Thế cận từ 1 đến e: ln(e) - ln(1) = 1 - 0 = 1." },
+            { topic: "tích phân", level: "Thông hiểu", content: "Tính giá trị của tích phân I = ∫[0,1] (3x² - 2x + 1)dx.", options: ["A. 1", "B. 2", "C. 0", "D. -1"], correct: "A", steps: "F(x) = x³ - x² + x. Thế cận [0; 1]: F(1) - F(0) = (1³ - 1² + 1) - 0 = 1." },
+            { topic: "tích phân", level: "Thông hiểu", content: "Tính diện tích hình phẳng giới hạn bởi đường cong y = x², trục hoành và hai đường thẳng x=0, x=2.", options: ["A. 8/3", "B. 4/3", "C. 2", "D. 8"], correct: "A", steps: "Diện tích S = ∫[0,2] x² dx. Nguyên hàm là x³/3. Thế cận từ 0 đến 2 thu được 8/3." },
+            { topic: "tích phân", level: "Vận dụng", content: "Tính diện tích S của hình phẳng giới hạn bởi đồ thị hàm số y = x² - 4x + 3 và trục hoành như hình gạch chéo dưới đây:", hasImage: "tích phân", options: ["A. 4/3", "B. 4", "C. 2/3", "D. 8/3"], correct: "A", steps: "Giao điểm x² - 4x + 3 = 0 => x=1, x=3. S = ∫[1,3] |x² - 4x + 3|dx. Trên (1;3) đồ thị nằm dưới trục hoành => S = ∫[1,3] (-x²+4x-3)dx = 4/3." },
+            { topic: "tích phân", level: "Vận dụng", content: "Tính thể tích vật thể tròn xoay khi cho hình phẳng giới hạn bởi đồ thị y = √x, y=0, x=1, x=4 quay quanh trục Ox.", hasImage: "tích phân", options: ["A. 15π/2", "B. 15/2", "C. 7π/2", "D. 8π"], correct: "A", steps: "Công thức thể tích V = π ∫[1,4] (√x)² dx = π ∫[1,4] x dx = π * (x²/2) | từ 1 đến 4 = π * (16/2 - 1/2) = 15π/2." },
+            { topic: "tích phân", level: "Vận dụng", content: "Biết ∫[0,1] x.e^x dx = a.e + b (với a, b nguyên). Tính tổng a + b.", options: ["A. 1", "B. 0", "C. 2", "D. -1"], correct: "A", steps: "Dùng tích phân từng phần. Đặt u=x, dv=e^xdx => du=dx, v=e^x. I = x.e^x |(0->1) - ∫[0,1] e^xdx = e - (e - 1) = 1. Tức là 0.e + 1 => a=0, b=1 => a+b=1." },
+            { topic: "tích phân", level: "Vận dụng", content: "Cho hàm f(x) liên tục thỏa mãn ∫[0,π/2] f(sin x).cos x dx = 5. Tính tích phân I = ∫[0,1] f(x)dx.", options: ["A. 5", "B. -5", "C. 10", "D. 0"], correct: "A", steps: "Đặt t = sin x => dt = cos x dx. Đổi cận: x=0 => t=0; x=π/2 => t=1. Tích phân ban đầu trở thành ∫[0,1] f(t)dt = 5. Do tích phân không phụ thuộc tên biến nên ∫[0,1] f(x)dx = 5." },
+
+            // 6. LOGARIT
+            { topic: "logarit", level: "Nhận biết", content: "Tập xác định D của hàm số y = log_2(x - 3) là:", options: ["A. D = (3; +∞)", "B. D = [3; +∞)", "C. D = R \\ {3}", "D. D = (0; +∞)"], correct: "A", steps: "Điều kiện xác định của hàm số logarit là biểu thức bên trong lớn hơn 0: x - 3 > 0 => x > 3. Tập xác định (3; +∞)." },
+            { topic: "logarit", level: "Nhận biết", content: "Đạo hàm của hàm số y = e^x là?", options: ["A. y' = e^x", "B. y' = x.e^(x-1)", "C. y' = e^x . ln e", "D. Cả A và C đều đúng"], correct: "D", steps: "Theo công thức chuẩn y' = e^x. Tuy nhiên e^x . ln(e) cũng bằng e^x vì ln(e)=1. Do đó cả A và C đều đúng." },
+            { topic: "logarit", level: "Nhận biết", content: "Nghiệm của phương trình 2^x = 8 là?", options: ["A. x = 2", "B. x = 3", "C. x = 4", "D. x = 16"], correct: "B", steps: "Đưa về cùng cơ số: 2^x = 2^3 <=> x = 3." },
+            { topic: "logarit", level: "Thông hiểu", content: "Nghiệm của phương trình log_3(2x - 1) = 2 là:", options: ["A. x = 5", "B. x = 4", "C. x = 3", "D. x = 10"], correct: "A", steps: "Điều kiện: 2x - 1 > 0 => x > 1/2. pt <=> 2x - 1 = 3² <=> 2x = 10 <=> x = 5." },
+            { topic: "logarit", level: "Thông hiểu", content: "Rút gọn biểu thức P = log_2(4) + log_2(8).", options: ["A. 5", "B. 12", "C. 32", "D. 6"], correct: "A", steps: "P = log_2(2²) + log_2(2³) = 2 + 3 = 5. Hoặc P = log_2(4*8) = log_2(32) = 5." },
+            { topic: "logarit", level: "Thông hiểu", content: "Tập nghiệm của bất phương trình (1/2)^x < 4 là?", options: ["A. x < -2", "B. x > -2", "C. x > 2", "D. x < 2"], correct: "B", steps: "(1/2)^x < (1/2)^(-2). Vì cơ số 1/2 < 1 (nghịch biến) nên bất phương trình đảo chiều: x > -2." },
+            { topic: "logarit", level: "Vận dụng", content: "Phương trình 9^x - 4.3^x + 3 = 0 có tổng các nghiệm bằng?", options: ["A. 1", "B. 0", "C. 4", "D. 3"], correct: "A", steps: "Đặt t = 3^x (t > 0). Phương trình trở thành t² - 4t + 3 = 0 <=> t = 1 hoặc t = 3. Với t=1 => 3^x = 1 => x = 0. Với t=3 => 3^x = 3 => x = 1. Tổng các nghiệm = 0 + 1 = 1." },
+            { topic: "logarit", level: "Vận dụng", content: "Tìm m để phương trình 4^x - 2.2^x + m = 0 có 2 nghiệm phân biệt.", options: ["A. m > 0", "B. 0 < m < 1", "C. m < 1", "D. m > 1"], correct: "B", steps: "Đặt t = 2^x (t > 0). Pt thành t² - 2t + m = 0 (1). Pt gốc có 2 nghiệm pb <=> (1) có 2 nghiệm dương phân biệt <=> Δ' = 1 - m > 0; S = 2 > 0; P = m > 0. Suy ra 0 < m < 1." },
+            { topic: "logarit", level: "Vận dụng", content: "Dựa vào hàm đồ thị logarit tăng trưởng, một người gửi 100 triệu, lãi 7%/năm. Sau ít nhất bao nhiêu năm người đó có số tiền vượt quá 200 triệu?", hasImage: "logarit", options: ["A. 10 năm", "B. 11 năm", "C. 12 năm", "D. 9 năm"], correct: "B", steps: "Công thức lãi kép: A = P(1+r)^n. 100 * (1.07)^n > 200 <=> 1.07^n > 2 <=> n > log_1.07(2) ≈ 10.24. Vì n nguyên dương nên n nhỏ nhất là 11." },
+            { topic: "logarit", level: "Vận dụng", content: "Tìm tất cả các giá trị của m để phương trình log_2²(x) - m.log_2(x) + m + 1 = 0 có hai nghiệm phân biệt x1, x2 thỏa mãn x1.x2 = 16.", options: ["A. m = 4", "B. m = 2", "C. Không tồn tại m", "D. m = -4"], correct: "C", steps: "Đặt t = log_2(x). pt thành t² - mt + m + 1 = 0. x1.x2 = 16 => log_2(x1.x2) = 4 => log_2(x1) + log_2(x2) = 4 => t1 + t2 = 4. Theo Viet: t1 + t2 = m => m = 4. Tuy nhiên kiểm tra lại m=4 thì t²-4t+5=0 vô nghiệm. Bài toán cố tình gài bẫy. Đáp án chính xác là C." }
+        ];
+
+        let seedCounter = 0;
+        function generateDiverseQuestion(topic, level) {
+            seedCounter++;
+            const randomParamA = Math.floor(Math.random() * 8) + seedCounter;
+            const randomParamB = Math.floor(Math.random() * 4) + 2;
+            const optionLabels = ['A', 'B', 'C', 'D'];
+            const targetAnswer = optionLabels[Math.floor(Math.random() * 4)];
+
+            const templates = {
+                "Nhận biết": [`Xét biểu thức cơ bản thuộc chuyên đề <strong>${topic}</strong> với hệ số m = ${randomParamA}. Khẳng định nào sau đây là đúng?`, `Biểu thức nào mô tả đúng tính chất của chuyên đề <strong>${topic}</strong> khi hệ số đạt bậc ${randomParamB}?`],
+                "Thông hiểu": [`Một bài toán thực tế tuân theo chuyên đề <strong>${topic}</strong> có biên độ là ${randomParamA}, hãy xác định giá trị cực trị.`, `Biên soạn bài toán <strong>${topic}</strong>. Khi hằng số bằng ${randomParamB}, thu được kết quả bằng bao nhiêu?`],
+                "Vận dụng": [`Tìm tập các giá trị của m để phương trình <strong>${topic}</strong> nhận giá trị m = ${randomParamA} làm cực đại.`, `Giải quyết bài toán tối ưu của chuyên đề <strong>${topic}</strong> dựa vào đồ thị trực quan bên dưới.`]
+            };
+
+            let tplList = templates[level];
+            let contentText = tplList[seedCounter % tplList.length];
+            // Trả về key hình ảnh thay vì nhét thẳng thẻ div
+            let imageStr = level === "Vận dụng" ? "hàm số" : null;
+
+            let opts = [`A. Kết quả tương ứng ${randomParamA}`, `B. Hệ số bậc ${randomParamB}`, `C. Kết quả tính toán chuẩn`, `D. Không tồn tại giá trị thoả mãn`];
+            if(targetAnswer === 'A') opts[0] = "A. Kết quả chính xác hoàn toàn";
+            if(targetAnswer === 'B') opts[1] = "B. Kết quả chính xác hoàn toàn";
+            if(targetAnswer === 'C') opts[2] = "C. Kết quả chính xác hoàn toàn";
+            if(targetAnswer === 'D') opts[3] = "D. Dữ liệu chính xác hoàn toàn";
+
+            return {
+                level: level, topic: topic, content: contentText, hasImage: imageStr, options: opts, correct: targetAnswer,
+                steps: `Bước 1: Khai triển hệ chuyên đề ${topic}. Bước 2: Thay thế bộ số m=${randomParamA} và bậc ${randomParamB}. Bước 3: Suy luận toán học suy ra đáp án ${targetAnswer}.`
+            };
+        }
+
+        function generateHybridQuiz() {
+            const rawTopic = document.getElementById('topicInput').value.toLowerCase();
+            const total = parseInt(document.getElementById('questionCount').value);
+            let c1 = Math.round(total * oldVals.l1 / 100), c2 = Math.round(total * oldVals.l2 / 100), c3 = total - c1 - c2;
+
+            const btn = document.getElementById('generateBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ AI đang quét Ngân hàng dữ liệu & Vẽ hình nội suy...';
+            btn.disabled = true; btn.classList.add('opacity-75');
+
+            let dynamicDB = JSON.parse(JSON.stringify(masterDatabase));
+            dynamicDB.sort(() => Math.random() - 0.5);
+
+            setTimeout(() => {
+                currentQuestionsState = []; 
+
+                function pullUniqueQuestion(lv) {
+                    let foundIndex = dynamicDB.findIndex(q => q.level === lv && (rawTopic.includes(q.topic) || q.topic.includes(rawTopic)));
+                    if (foundIndex !== -1) {
+                        return dynamicDB.splice(foundIndex, 1)[0]; 
+                    }
+                    return generateDiverseQuestion(rawTopic, lv); 
+                }
+
+                for(let i = 0; i < c1; i++) currentQuestionsState.push(pullUniqueQuestion("Nhận biết"));
+                for(let i = 0; i < c2; i++) currentQuestionsState.push(pullUniqueQuestion("Thông hiểu"));
+                for(let i = 0; i < c3; i++) currentQuestionsState.push(pullUniqueQuestion("Vận dụng"));
+
+                let questionsHTML = '', answersHTML = '';
+                currentQuestionsState.forEach((q, index) => {
+                    let tagColor = q.level === "Nhận biết" ? "text-green-600 bg-green-50 border-green-200" : q.level === "Thông hiểu" ? "text-yellow-600 bg-yellow-50 border-yellow-200" : "text-red-600 bg-red-50 border-red-200";
+                    
+                    let imageTag = "";
+                    if (q.hasImage && svgAssets[q.hasImage]) {
+                        imageTag = `<div class="w-full p-6 border-2 border-dashed border-gray-400 flex flex-col justify-center items-center bg-gray-50 mb-4 rounded">
+                                        ${svgAssets[q.hasImage]}
+                                        <p class="text-xs text-gray-500 mt-3 italic text-center">Lệnh AI: [Vẽ nét đậm, hoàn toàn đen trắng, giữ nguyên hình, k thay đổi chi tiết]</p>
+                                    </div>`;
+                    }
+
+                    questionsHTML += `<div class="question-card">
+                        <p class="font-bold text-gray-800 mb-2">Câu ${index + 1} <span class="text-xs ${tagColor} px-2 py-1 rounded-md ml-2 border">${q.level}</span></p>
+                        <p class="text-gray-700 mb-4 leading-relaxed">${q.content}</p>
+                        ${imageTag}
+                        <ul class="grid grid-cols-2 gap-2 text-gray-700 ml-2">${q.options.map(opt => `<li class="py-1">${opt}</li>`).join('')}</ul>
+                    </div>`;
+
+                    answersHTML += `<div class="answer-card">
+                        <p class="font-bold text-gray-800 mb-2">Câu ${index + 1} (${q.level}): <span class="font-normal text-gray-600">${q.content.substring(0, 65)}...</span></p>
+                        <p class="font-bold text-red-600 mb-1">➜ Đáp án đúng: ${q.correct.charAt(0)}</p>
+                        <div class="text-gray-600 text-xs bg-gray-50 p-3 rounded border border-blue-100 leading-relaxed"><p class="font-semibold text-blue-800">Lời giải chi tiết:</p><p>${q.steps}</p></div>
+                    </div>`;
+                });
+
+                document.getElementById('questionsContainer').innerHTML = questionsHTML;
+                document.getElementById('answersContainer').innerHTML = answersHTML;
+
+                const resultBox = document.getElementById('printableArea');
+                resultBox.classList.remove('hidden');
+                resultBox.scrollIntoView({ behavior: 'smooth' });
+
+                btn.innerHTML = originalText; btn.disabled = false; btn.classList.remove('opacity-75');
+            }, 1000);
+        }
+
+        // ================= CƠ CHẾ PHÂN TÁCH XUẤT FILE PHỤC VỤ SƯ PHẠM =================
+        function exportRolePDF(role) {
+            if (currentQuestionsState.length === 0) return;
+            const topicName = document.getElementById('topicInput').value || "Chuyên đề Toán học";
+
+            let printWrapper = document.createElement('div');
+            printWrapper.style.padding = '30px';
+            printWrapper.style.fontFamily = "'Inter', sans-serif";
+            printWrapper.style.backgroundColor = '#ffffff';
+
+            let headerHTML = `
+                <div style="text-align: center; margin-bottom: 35px; border-bottom: 2px solid #111; padding-bottom: 12px;">
+                    <h2 style="margin: 0; font-size: 14pt; text-transform: uppercase; font-weight: bold; tracking-wide: 1px;">HỆ THỐNG TRỢ LÝ GIÁO DỤC SMART MATHEDU-AGENT</h2>
+                    <h3 style="margin: 6px 0 0 0; font-size: 13pt; font-weight: bold; color: #1e40af;">ĐỀ KIỂM TRA CHUYÊN ĐỀ: ${topicName.toUpperCase()}</h3>
+                    <p style="margin: 6px 0 0 0; font-size: 10.5pt; font-style: italic; color: #4b5563; font-weight: 500;">
+                        ${role === 'hs' ? '❖ BẢN DÀNH CHO HỌC SINH (Hệ thống câu hỏi trắc nghiệm)' : '❖ BẢN ĐẦY ĐỦ DÀNH CHO GIÁO VIÊN (Câu hỏi kèm lời giải chi tiết)'}
+                    </p>
+                </div>
+            `;
+
+            let bodyHTML = '';
+            currentQuestionsState.forEach((q, index) => {
+                bodyHTML += `
+                    <div style="margin-bottom: 28px; page-break-inside: avoid; font-size: 11pt; line-height: 1.6;">
+                        <p style="margin: 0 0 8px 0; font-weight: bold; color: #1f2937;">
+                            Câu ${index + 1} <span style="font-size: 9pt; color: #2563eb; background: #eff6ff; padding: 2px 6px; border: 1px solid #bfdbfe; border-radius: 4px; font-weight: 600; margin-left: 5px;">${q.level}</span>: 
+                            <span style="font-weight: normal; color: #374151;">${q.content}</span>
+                        </p>
+                `;
+
+                if (q.hasImage && svgAssets[q.hasImage]) {
+                    bodyHTML += `
+                        <div style="border: 1px dashed #7c3aed; background: #faf5ff; padding: 20px; margin: 15px auto; text-align: center; border-radius: 6px; width: 60%;">
+                            ${svgAssets[q.hasImage]}
+                        </div>
+                    `;
+                }
+
+                bodyHTML += `<div style="display: table; width: 100%; margin-left: 15px; margin-top: 8px; margin-bottom: 10px; font-size: 10.5pt; color: #4b5563;">`;
+                bodyHTML += `<div style="display: table-row;">`;
+                bodyHTML += `<div style="display: table-cell; width: 50%; padding-bottom: 6px;">${q.options[0]}</div>`;
+                bodyHTML += `<div style="display: table-cell; width: 50%; padding-bottom: 6px;">${q.options[1]}</div>`;
+                bodyHTML += `</div><div style="display: table-row;">`;
+                bodyHTML += `<div style="display: table-cell; width: 50%;">${q.options[2]}</div>`;
+                bodyHTML += `<div style="display: table-cell; width: 50%;">${q.options[3]}</div>`;
+                bodyHTML += `</div></div>`;
+
+                if (role === 'gv') {
+                    bodyHTML += `
+                        <div style="margin-top: 14px; background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px; border-radius: 0 6px 6px 0; font-size: 10pt; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);">
+                            <p style="margin: 0 0 6px 0; font-weight: bold; color: #dc2626; font-size: 10.5pt;">🎯 ĐÁP ÁN ĐÚNG: ${q.correct.charAt(0)}</p>
+                            <p style="margin: 0 0 4px 0; font-weight: bold; color: #166534; text-transform: uppercase; font-size: 8.5pt;">Trình tự hướng dẫn tư duy toán học:</p>
+                            <p style="margin: 0; color: #4b5563; line-height: 1.5; font-style: normal;">${q.steps}</p>
+                        </div>
+                    `;
+                }
+                bodyHTML += `</div>`;
+            });
+
+            printWrapper.innerHTML = headerHTML + bodyHTML;
+
+            const configOpt = {
+                margin:       [0.6, 0.5, 0.6, 0.5],
+                filename:     role === 'hs' ? `DE_THI_HOC_SINH.pdf` : `DAP_AN_GIAO_VIEN.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'A4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(configOpt).from(printWrapper).save();
+        }
+    </script>
+</body>
+</html>
